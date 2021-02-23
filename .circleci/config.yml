@@ -1,0 +1,58 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@0.2.1
+  gcp-gcr: circleci/gcp-gcr@0.11.0
+  gcp-gke: circleci/gcp-gke@1.1.0
+
+jobs:
+  build-and-push-prod-image:
+    description: Build and push image to Google Container Registry
+    executor: python/default
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - gcp-gcr/gcr-auth
+      - gcp-gcr/build-image:
+          tag: $CIRCLE_SHA1
+          image: auto-assign-bot/$CIRCLE_BRANCH
+          dockerfile: Dockerfile
+      - gcp-gcr/push-image:
+          tag: $CIRCLE_SHA1
+          image: auto-assign-bot/$CIRCLE_BRANCH
+
+  deploy:
+    description: Deploy application to Google Kubernetes Engine
+    executor: gcp-gke/default
+    steps:
+      - gcp-gke/install
+      - gcp-gcr/gcr-auth
+      - gcp-gke/rollout-image:
+          cluster: $CLUSTER
+          namespace: auto-assign-bot
+          deployment: api
+          container: app
+          image: gcr.io/$GOOGLE_PROJECT_ID/auto-assign-bot/$CIRCLE_BRANCH
+          tag: $CIRCLE_SHA1
+
+workflows:
+  prod:
+    jobs:
+      - build-and-push-prod-image:
+          context:
+            - Prod
+          filters:
+            branches:
+              only:
+                - master
+      - deploy:
+          context:
+            - Prod
+          requires:
+            - build-and-push-prod-image
+          filters:
+            branches:
+              only:
+                - master
+
