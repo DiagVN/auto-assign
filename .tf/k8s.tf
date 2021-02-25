@@ -100,10 +100,9 @@ resource "kubernetes_deployment" "api" {
           port {
             container_port = 3000
           }
-
+          
           liveness_probe {
-            http_get {
-              path = "/health/"
+            tcp_socket {
               port = 3000
             }
 
@@ -113,8 +112,7 @@ resource "kubernetes_deployment" "api" {
           }
 
           readiness_probe {
-            http_get {
-              path = "/health/"
+            tcp_socket {
               port = 3000
             }
 
@@ -198,7 +196,7 @@ resource "kubernetes_ingress" "auto-assign" {
     annotations = {
       "ingress.kubernetes.io/enable-cors" = "true"
       "ingress.kubernetes.io/force-ssl-redirect" = true
-      "ingress.kubernetes.io/static-ip" = "${var.project}-${var.env}"
+      "kubernetes.io/ingress.global-static-ip-name" = "${var.project}-${var.env}"
       "networking.gke.io/managed-certificates" = "auto-assign"
     }
   }
@@ -208,12 +206,6 @@ resource "kubernetes_ingress" "auto-assign" {
       service_name = "api"
       service_port = "80"
     }
-  }
-
-  lifecycle {
-    ignore_changes = [
-      metadata.0.annotations["ingress.kubernetes.io/static-ip"]
-    ]
   }
 
   depends_on = [
